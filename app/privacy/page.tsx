@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import SiteFooter from "@/components/SiteFooter";
+import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "Privacy | Gateway Senior Advisors",
@@ -12,6 +12,12 @@ export default function Privacy() {
       <main className="flex-1">
         <section className="px-6 py-16 sm:py-24">
           <div className="mx-auto max-w-2xl">
+            <Link
+              href="/"
+              className="inline-block mb-8 text-sm text-body-secondary hover:text-body transition-colors"
+            >
+              ← Back
+            </Link>
             <h1 className="font-display text-4xl text-forest">Privacy</h1>
             <p className="mt-4 text-body-secondary">
               This page explains, in plain language, what information we collect and
@@ -70,7 +76,6 @@ export default function Privacy() {
           </div>
         </section>
       </main>
-      <SiteFooter />
     </div>
   );
 }

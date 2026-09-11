@@ -25,8 +25,13 @@ export default function Home() {
     <div className="flex flex-col flex-1">
       <main className="flex-1">
         {/* Hero */}
-        <section className="px-6 pt-16 pb-14 sm:pt-24 sm:pb-20">
+        <section className="px-6 pt-10 pb-14 sm:pt-14 sm:pb-20">
           <div className="mx-auto max-w-3xl text-center">
+            <img
+              src="/gsa-logo-wordmark.svg"
+              alt="Gateway Senior Advisors"
+              className="mx-auto h-10 sm:h-12 w-auto mb-10 sm:mb-14"
+            />
             <h1 className="font-display text-4xl sm:text-5xl md:text-6xl leading-[1.1] text-forest">
               Find the Right Senior Living in St. Louis
             </h1>
