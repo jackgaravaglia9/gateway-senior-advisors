@@ -67,7 +67,7 @@ export default function Home() {
         </section>
 
         {/* Process */}
-        <section className="px-6 py-16 sm:py-20 lg:py-24">
+        <section id="how-it-works" className="scroll-mt-20 px-6 py-16 sm:py-20 lg:py-24">
           <div className="mx-auto max-w-4xl">
             <div className="grid gap-10 lg:gap-14 sm:grid-cols-3">
               {STEPS.map((step) => (
