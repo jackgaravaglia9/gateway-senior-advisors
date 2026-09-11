@@ -3,6 +3,7 @@ import { Fraunces, Inter } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
 import { GA_MEASUREMENT_ID } from "@/lib/gtag";
+import SiteHeader from "@/components/SiteHeader";
 
 const fraunces = Fraunces({
   variable: "--font-fraunces",
@@ -45,6 +46,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             </Script>
           </>
         ) : null}
+        <SiteHeader />
         {children}
       </body>
     </html>
