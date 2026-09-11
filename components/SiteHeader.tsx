@@ -19,7 +19,7 @@ export default function SiteHeader() {
           <img
             src="/gsa-logo-wordmark.svg"
             alt="Gateway Senior Advisors"
-            className="h-12 sm:h-14 w-auto"
+            className="h-14 sm:h-20 w-auto"
           />
         </Link>
 
