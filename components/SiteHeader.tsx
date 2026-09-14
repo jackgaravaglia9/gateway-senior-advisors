@@ -2,12 +2,19 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { captureEvent } from "@/lib/posthog";
 
 const NAV_LINKS = [
   { href: "/#how-it-works", label: "How It Works" },
   { href: "/#intake-form", label: "Find My Options" },
   { href: "/privacy", label: "Privacy" },
 ];
+
+function handleNavClick(href: string) {
+  if (href === "/#intake-form") {
+    captureEvent("cta_clicked", { cta_text: "Find My Options", location: "nav" });
+  }
+}
 
 export default function SiteHeader() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -28,6 +35,7 @@ export default function SiteHeader() {
             <a
               key={link.href}
               href={link.href}
+              onClick={() => handleNavClick(link.href)}
               className="text-forest font-medium hover:text-gold transition-colors"
             >
               {link.label}
@@ -60,7 +68,10 @@ export default function SiteHeader() {
             <a
               key={link.href}
               href={link.href}
-              onClick={() => setMenuOpen(false)}
+              onClick={() => {
+                handleNavClick(link.href);
+                setMenuOpen(false);
+              }}
               className="text-forest font-medium text-lg"
             >
               {link.label}

@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import IntakeForm from "@/components/IntakeForm";
 import SiteFooter from "@/components/SiteFooter";
+import CtaButton from "@/components/CtaButton";
 
 const STEPS = [
   {
@@ -37,12 +38,13 @@ export default function Home() {
             <p className="mt-4 text-forest font-medium">Free. No obligation.</p>
 
             <div className="mt-10">
-              <a
+              <CtaButton
                 href="#intake-form"
+                location="hero"
                 className="inline-block bg-gold hover:bg-gold-light text-white px-9 py-4 text-lg font-medium transition-colors"
               >
                 Find My Options
-              </a>
+              </CtaButton>
             </div>
 
             <p className="mt-5 text-sm text-body-secondary max-w-md mx-auto">

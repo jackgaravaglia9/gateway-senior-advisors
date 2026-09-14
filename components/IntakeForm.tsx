@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { trackEvent } from "@/lib/gtag";
+import { captureEvent } from "@/lib/posthog";
 import { emptyUtmValues, UTM_FIELDS, type UtmValues } from "@/lib/utm";
 import { emptyIntakeFormData, type IntakeFormData } from "@/lib/intake-form-types";
 
@@ -63,6 +64,7 @@ export default function IntakeForm() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const viewedSteps = useRef<Set<number>>(new Set());
+  const formStarted = useRef(false);
 
   const utm = useMemo<UtmValues>(() => {
     const values = emptyUtmValues();
@@ -79,6 +81,10 @@ export default function IntakeForm() {
   }, [step]);
 
   function update<K extends keyof IntakeFormData>(key: K, value: IntakeFormData[K]) {
+    if (!formStarted.current) {
+      formStarted.current = true;
+      captureEvent("form_started", { form_name: "intake_form" });
+    }
     setData((prev) => ({ ...prev, [key]: value }));
   }
 
@@ -156,6 +162,7 @@ export default function IntakeForm() {
       }
 
       trackEvent("generate_lead");
+      captureEvent("form_submitted", { form_name: "intake_form" });
       router.push("/thank-you");
     } catch {
       setSubmitError(

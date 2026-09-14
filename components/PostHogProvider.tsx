@@ -3,9 +3,7 @@
 import { useEffect } from "react";
 import posthog from "posthog-js";
 import { PostHogProvider as PHProvider } from "posthog-js/react";
-
-const POSTHOG_KEY = process.env.NEXT_PUBLIC_POSTHOG_KEY;
-const POSTHOG_HOST = process.env.NEXT_PUBLIC_POSTHOG_HOST || "https://us.i.posthog.com";
+import { POSTHOG_KEY, POSTHOG_HOST } from "@/lib/posthog";
 
 export default function PostHogProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
