@@ -4,6 +4,7 @@ import Script from "next/script";
 import "./globals.css";
 import { GA_MEASUREMENT_ID, GOOGLE_ADS_ID } from "@/lib/gtag";
 import SiteHeader from "@/components/SiteHeader";
+import PostHogProvider from "@/components/PostHogProvider";
 
 const fraunces = Fraunces({
   variable: "--font-fraunces",
@@ -43,8 +44,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             ${GA_MEASUREMENT_ID ? `gtag('config', '${GA_MEASUREMENT_ID}');` : ""}
           `}
         </Script>
-        <SiteHeader />
-        {children}
+        <PostHogProvider>
+          <SiteHeader />
+          {children}
+        </PostHogProvider>
       </body>
     </html>
   );

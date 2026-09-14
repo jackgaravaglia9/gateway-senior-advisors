@@ -19,13 +19,18 @@ Copy `.env.example` to `.env.local` and fill in:
 | --- | --- | --- |
 | `NEXT_PUBLIC_GA_MEASUREMENT_ID` | GA4 Measurement ID (`G-XXXXXXX`) | GA4 Admin → Data Streams → your web stream |
 | `SHEET_WEBHOOK_URL` | Google Apps Script Web App URL that appends a row to the Sheet | Apps Script project → Deploy → Web app (deploy with access "Anyone") |
+| `NEXT_PUBLIC_POSTHOG_KEY` | PostHog project API key | PostHog → Project Settings → Project API Key |
+| `NEXT_PUBLIC_POSTHOG_HOST` | PostHog ingestion host | `https://us.i.posthog.com` (US cloud, default) or `https://eu.i.posthog.com` (EU cloud) — match your project's region |
 
-There is no third env var beyond these two — `SHEET_WEBHOOK_URL` is server-only
-(never sent to the browser); `NEXT_PUBLIC_GA_MEASUREMENT_ID` is intentionally public,
-same as any GA4 measurement ID.
+`SHEET_WEBHOOK_URL` is server-only (never sent to the browser). The `NEXT_PUBLIC_*`
+vars are intentionally public, same as any client-side analytics key.
 
-If `NEXT_PUBLIC_GA_MEASUREMENT_ID` is unset, the app simply skips loading `gtag.js` —
-nothing breaks. If `SHEET_WEBHOOK_URL` is unset, `/api/submit` returns a 500 and the
+The Google Ads conversion tag (`AW-18443867366`) is hardcoded in `app/layout.tsx` —
+it's not an env var since it's a fixed, already-known ID for this account.
+
+If `NEXT_PUBLIC_GA_MEASUREMENT_ID` is unset, the app skips the GA4 `gtag('config', ...)`
+call (the Ads tag still loads). If `NEXT_PUBLIC_POSTHOG_KEY` is unset, PostHog never
+initializes. If `SHEET_WEBHOOK_URL` is unset, `/api/submit` returns a 500 and the
 form shows its inline error state (this is expected and useful for testing that
 error path).
 
@@ -89,9 +94,12 @@ URL), submit the form, and confirm you get the inline error message on the form
 itself — with your entered data still in place — instead of losing your input or
 being redirected.
 
-Once you're on `/thank-you`, that's where a Google Ads conversion tag gets pasted
-into the `<head>` later — the page loads cleanly on a direct visit too, not only via
-the form redirect, so the tag fires on bookmarks/shares as well.
+`/thank-you` loads cleanly on a direct visit too, not only via the form redirect, so
+the Google Ads tag fires on bookmarks/shares as well.
+
+**To test PostHog:** set `NEXT_PUBLIC_POSTHOG_KEY`, open your PostHog project's
+Activity/Live Events view, then browse the site on `localhost`. You should see
+`$pageview` events as you navigate between pages.
 
 ## Deploying
 
@@ -99,8 +107,11 @@ the form redirect, so the tag fires on bookmarks/shares as well.
 vercel deploy
 ```
 
-Set `NEXT_PUBLIC_GA_MEASUREMENT_ID` and `SHEET_WEBHOOK_URL` as Environment Variables
-in the Vercel project settings before going live.
+Set `NEXT_PUBLIC_GA_MEASUREMENT_ID`, `SHEET_WEBHOOK_URL`, `NEXT_PUBLIC_POSTHOG_KEY`,
+and `NEXT_PUBLIC_POSTHOG_HOST` as Environment Variables in the Vercel project settings
+before going live. The `NEXT_PUBLIC_*` ones must use the **Config** type, not
+**Secret** — Secret-type vars are write-only and never get exposed to the browser,
+which breaks anything meant to run client-side.
 
 ## Building the GA4 funnel report
 
