@@ -50,7 +50,7 @@ const TIMELINE_OPTIONS = [
 ];
 
 function fieldClasses(hasError: boolean) {
-  return `w-full border bg-white px-4 py-3 text-body placeholder:text-body-secondary/60 focus:outline-none focus:ring-2 focus:ring-gold/50 ${
+  return `w-full border bg-white px-4 py-3.5 text-body placeholder:text-body-secondary/60 focus:outline-none focus:ring-2 focus:ring-gold/50 ${
     hasError ? "border-red-400" : "border-border"
   }`;
 }
@@ -176,7 +176,7 @@ export default function IntakeForm() {
   return (
     <div
       id="intake-form"
-      className="scroll-mt-8 border border-border bg-white p-6 sm:p-10"
+      className="scroll-mt-8 border border-border bg-white p-6 sm:p-10 shadow-[0_1px_3px_rgba(34,49,41,0.06)]"
     >
       <ProgressIndicator step={step} />
 
@@ -341,12 +341,12 @@ export default function IntakeForm() {
             </Field>
 
             <div>
-              <label className="flex items-start gap-3 text-body">
+              <label className="flex items-start gap-3 text-body py-1 -my-1 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={data.contactConsent}
                   onChange={(e) => update("contactConsent", e.target.checked)}
-                  className="mt-1 h-4 w-4 accent-gold"
+                  className="mt-0.5 h-5 w-5 shrink-0 accent-gold"
                 />
                 <span>You may contact me about the options you find.</span>
               </label>
@@ -356,12 +356,12 @@ export default function IntakeForm() {
             </div>
 
             <div>
-              <label className="flex items-start gap-3 text-body">
+              <label className="flex items-start gap-3 text-body py-1 -my-1 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={data.shareConsent}
                   onChange={(e) => update("shareConsent", e.target.checked)}
-                  className="mt-1 h-4 w-4 accent-gold"
+                  className="mt-0.5 h-5 w-5 shrink-0 accent-gold"
                 />
                 <span>
                   You may share my information with specific communities, but only after
@@ -383,7 +383,7 @@ export default function IntakeForm() {
             <button
               type="button"
               onClick={handleBack}
-              className="px-5 py-3 text-body-secondary hover:text-body transition-colors"
+              className="px-5 py-3.5 text-body-secondary hover:text-body transition-colors"
             >
               Back
             </button>
@@ -394,7 +394,7 @@ export default function IntakeForm() {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="bg-gold hover:bg-gold-light text-white px-8 py-3 font-medium transition-colors disabled:opacity-60"
+            className="bg-gold hover:bg-gold-light text-white px-8 py-3.5 font-medium transition-colors disabled:opacity-60"
           >
             {isSubmitting ? "Submitting…" : step === TOTAL_STEPS ? "Submit" : "Continue"}
           </button>
@@ -469,7 +469,7 @@ function RadioGroup({
         {options.map((option) => (
           <label
             key={option}
-            className={`flex items-center gap-3 border px-4 py-3 cursor-pointer transition-colors ${
+            className={`flex items-center gap-3 border px-4 py-3.5 cursor-pointer transition-colors ${
               value === option ? "border-gold bg-cream-alt" : "border-border bg-white"
             }`}
           >
@@ -479,7 +479,7 @@ function RadioGroup({
               value={option}
               checked={value === option}
               onChange={() => onChange(option)}
-              className="h-4 w-4 accent-gold"
+              className="h-5 w-5 shrink-0 accent-gold"
             />
             <span className="text-body">{option}</span>
           </label>
