@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { trackEvent } from "@/lib/gtag";
+import { trackEvent, trackAdsConversion } from "@/lib/gtag";
 import { captureEvent } from "@/lib/posthog";
 import { emptyUtmValues, UTM_FIELDS, type UtmValues } from "@/lib/utm";
 import { emptyIntakeFormData, type IntakeFormData } from "@/lib/intake-form-types";
@@ -163,6 +163,7 @@ export default function IntakeForm() {
 
       trackEvent("generate_lead");
       captureEvent("form_submitted", { form_name: "intake_form" });
+      trackAdsConversion();
       router.push("/thank-you");
     } catch {
       setSubmitError(
