@@ -2,9 +2,11 @@ export interface IntakeFormData {
   relationship: string;
   age: string;
   careType: string;
+  diagnosis: string;
   location: string;
   livingSituation: string;
   budget: string;
+  payment: string;
   timeline: string;
   fullName: string;
   phone: string;
@@ -18,9 +20,11 @@ export function emptyIntakeFormData(): IntakeFormData {
     relationship: "",
     age: "",
     careType: "",
+    diagnosis: "",
     location: "",
     livingSituation: "",
     budget: "",
+    payment: "",
     timeline: "",
     fullName: "",
     phone: "",

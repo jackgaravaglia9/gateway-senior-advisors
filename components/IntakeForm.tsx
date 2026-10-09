@@ -9,9 +9,12 @@ import { emptyIntakeFormData, type IntakeFormData } from "@/lib/intake-form-type
 import {
   BUDGET_OPTIONS,
   CARE_TYPE_OPTIONS,
+  DIAGNOSIS_OPTIONS,
   LIVING_SITUATION_OPTIONS,
+  PAYMENT_OPTIONS,
   RELATIONSHIP_OPTIONS,
   TIMELINE_OPTIONS,
+  needsDiagnosis,
 } from "@/lib/intake-options";
 
 const TOTAL_STEPS = 4;
@@ -65,13 +68,15 @@ export default function IntakeForm() {
       else if (Number.isNaN(Number(data.age)) || Number(data.age) <= 0)
         next.age = "Please enter a valid age.";
       if (!data.careType) next.careType = "Please select a care type.";
+      if (needsDiagnosis(data.careType) && !data.diagnosis) next.diagnosis = "Please select one.";
     }
     if (currentStep === 2) {
-      if (!data.location.trim()) next.location = "Please enter a city, zip, or neighborhood.";
+      if (!/^\d{5}$/.test(data.location.trim())) next.location = "Please enter a 5-digit ZIP code.";
       if (!data.livingSituation) next.livingSituation = "Please select one.";
     }
     if (currentStep === 3) {
       if (!data.budget) next.budget = "Please select a budget range.";
+      if (!data.payment) next.payment = "Please select one.";
       if (!data.timeline) next.timeline = "Please select a timeline.";
     }
     if (currentStep === 4) {
@@ -116,6 +121,8 @@ export default function IntakeForm() {
     try {
       const payload = {
         ...data,
+        // Hidden for other care types, so never send a stale answer from a changed mind.
+        diagnosis: needsDiagnosis(data.careType) ? data.diagnosis : "",
         ...utm,
         submittedAt: new Date().toISOString(),
       };
@@ -203,6 +210,17 @@ export default function IntakeForm() {
                 ))}
               </select>
             </Field>
+
+            {needsDiagnosis(data.careType) && (
+              <RadioGroup
+                label="Has a doctor diagnosed dementia or Alzheimer's?"
+                name="diagnosis"
+                options={DIAGNOSIS_OPTIONS}
+                value={data.diagnosis}
+                onChange={(v) => update("diagnosis", v)}
+                error={errors.diagnosis}
+              />
+            )}
           </fieldset>
         )}
 
@@ -213,16 +231,18 @@ export default function IntakeForm() {
             </legend>
 
             <Field
-              label="Location in the St. Louis area"
+              label="ZIP code of where care is needed"
               htmlFor="location"
-              hint="City, zip, or neighborhood"
               error={errors.location}
             >
               <input
                 id="location"
                 type="text"
+                inputMode="numeric"
+                autoComplete="postal-code"
+                maxLength={5}
                 value={data.location}
-                onChange={(e) => update("location", e.target.value)}
+                onChange={(e) => update("location", e.target.value.replace(/\D/g, "").slice(0, 5))}
                 className={fieldClasses(!!errors.location)}
               />
             </Field>
@@ -259,6 +279,15 @@ export default function IntakeForm() {
                 ))}
               </select>
             </Field>
+
+            <RadioGroup
+              label="How do you plan to pay for care?"
+              name="payment"
+              options={PAYMENT_OPTIONS}
+              value={data.payment}
+              onChange={(v) => update("payment", v)}
+              error={errors.payment}
+            />
 
             <RadioGroup
               label="Timeline"
@@ -318,7 +347,10 @@ export default function IntakeForm() {
                   onChange={(e) => update("contactConsent", e.target.checked)}
                   className="mt-0.5 h-5 w-5 shrink-0 accent-gold"
                 />
-                <span>You may contact me about the options you find.</span>
+                <span>
+                  You may contact me by phone, text, or email about senior living options.
+                  Message and data rates may apply.
+                </span>
               </label>
               {errors.contactConsent && (
                 <p className="mt-1 text-sm text-red-600">{errors.contactConsent}</p>

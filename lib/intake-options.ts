@@ -33,6 +33,29 @@ export const BUDGET_OPTIONS: string[] = [
   "Not sure yet",
 ];
 
+export const DIAGNOSIS_OPTIONS: string[] = [
+  "Yes",
+  "In the process of getting one",
+  "No",
+  "Not sure",
+];
+
+export const PAYMENT_OPTIONS: string[] = [
+  "Private funds (savings, income, or a home sale)",
+  "Private funds plus long-term care insurance",
+  "Private funds plus a VA benefit",
+  "Medicaid",
+  "Not sure yet",
+];
+
+// The diagnosis question is only asked, and only required, for these care types. For any
+// other care type it is hidden and sent as an empty string.
+const DIAGNOSIS_CARE_TYPES: string[] = ["Memory care", "Not sure yet"];
+
+export function needsDiagnosis(careType: string): boolean {
+  return DIAGNOSIS_CARE_TYPES.includes(careType);
+}
+
 export const TIMELINE_OPTIONS: string[] = [
   "Immediately (within 30 days)",
   "1-3 months",

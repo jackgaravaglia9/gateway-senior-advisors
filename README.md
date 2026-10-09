@@ -42,10 +42,12 @@ error path).
 {
   "relationship": "My parent",
   "age": "82",
-  "careType": "Assisted living",
-  "location": "Kirkwood, MO",
+  "careType": "Memory care",
+  "diagnosis": "Yes",
+  "location": "63122",
   "livingSituation": "Living at home alone",
   "budget": "$7,500 to $10,000",
+  "payment": "Private funds (savings, income, or a home sale)",
   "timeline": "1-3 months",
   "fullName": "Jane Doe",
   "phone": "314-555-0100",
@@ -63,14 +65,32 @@ error path).
 }
 ```
 
+`location` is a required 5-digit ZIP code. `diagnosis` ("Has a doctor diagnosed dementia or
+Alzheimer's?") is only asked, and only required, when care type is "Memory care" or "Not
+sure yet"; for every other care type it is sent as an empty string. `payment` is always
+required. All the choice lists live in `lib/intake-options.ts`, which both the form and the
+server read from.
+
 `submittedAt` is the visitor's browser clock; `receivedAt` is stamped by the server and is
 the one to trust. The route only treats a lead as saved when the script replies
 `{"ok":true}`, and gives up after 8 seconds.
 
 The current script (appends the row, then emails an alert with a Kauhale-fit line) is
 saved in [`docs/apps-script.gs`](docs/apps-script.gs). Paste it into the Sheet's Apps
-Script editor and deploy a new version of the existing Web app. It expects a `receivedAt`
-header in cell T1.
+Script editor and deploy a new version of the existing Web app.
+
+**Sheet columns, in order** (row 1 headers; new columns only ever go on the right):
+
+| A | B | C | D | E | F | G | H | I | J | K |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| submittedAt | fullName | phone | email | relationship | age | careType | location | livingSituation | budget | timeline |
+
+| L | M | N | O | P | Q | R | S | T | U | V |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| contactConsent | shareConsent | utm_source | utm_medium | utm_campaign | utm_term | utm_content | gclid | receivedAt | diagnosis | payment |
+
+Add headers for `receivedAt` (T1), `diagnosis` (U1), and `payment` (V1) if they are not
+there yet.
 
 ## Running locally
 

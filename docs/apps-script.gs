@@ -13,11 +13,13 @@
  * No secrets live in this file. Alerts go to the Google account that owns and
  * runs the script unless ALERT_EMAIL is filled in below.
  *
- * Sheet columns (row 1 headers, in this order):
+ * Sheet columns (row 1 headers, in this order; new columns only ever go on the right):
  *   A submittedAt  B fullName  C phone  D email  E relationship  F age
- *   G careType  H location  I livingSituation  J budget  K timeline
+ *   G careType  H location (a 5-digit ZIP code)  I livingSituation  J budget  K timeline
  *   L contactConsent  M shareConsent  N utm_source  O utm_medium  P utm_campaign
- *   Q utm_term  R utm_content  S gclid  T receivedAt
+ *   Q utm_term  R utm_content  S gclid  T receivedAt  U diagnosis  V payment
+ *
+ * diagnosis is blank unless care type is "Memory care" or "Not sure yet".
  */
 
 var SHEET_NAME = "Sheet1";
@@ -25,11 +27,25 @@ var ALERT_EMAIL = ""; // optional. Blank = email the account that deployed this 
 
 // ---- Kauhale fit rules (edit here if the criteria change) ----
 var KAUHALE_CARE_TYPE = "Memory care";
+var CARE_TYPE_UNSURE = "Not sure yet"; // CHECK, not NO: confirm by phone whether it is memory care
 var BUDGETS_7500_PLUS = ["$7,500 to $10,000", "$10,000+"];
 var BUDGETS_UNDER_7500 = ["Under $4,500", "$4,500 to $6,500", "$6,500 to $7,500"];
 
-// "St. Louis County" is judged from the free-text location box, so this is a keyword/ZIP
-// check, not geography. A miss means "verify", not "no". Names are lowercase, no punctuation.
+// Payment: Medicaid is a NO. The two private-pay answers are fine. Anything else (VA benefit,
+// "Not sure yet", or an unexpected value) is CHECK. A blank answer (older leads) is ignored.
+var PAYMENT_NO = ["Medicaid"];
+var PAYMENT_OK = [
+  "Private funds (savings, income, or a home sale)",
+  "Private funds plus long-term care insurance"
+];
+
+// Diagnosis: "No" / "Not sure" (or anything unexpected) is CHECK. Blank means it was not asked.
+var DIAGNOSIS_OK = ["Yes", "In the process of getting one"];
+
+// "St. Louis County" is judged from the ZIP code on the form (the location field is now a plain
+// 5-digit ZIP). The ZIP list is what matters now; the place names below only help read older
+// leads that were typed as free text. A miss means "verify", not "no". Names are lowercase,
+// no punctuation.
 var ST_LOUIS_COUNTY_PLACES = [
   "st louis county", "stl county", "west county", "south county", "north county",
   "affton", "ballwin", "bella villa", "bellefontaine neighbors", "bel nor", "bel ridge",
@@ -129,7 +145,9 @@ function sampleLead_() {
     timeline: "Immediately (within 30 days)",
     budget: "$7,500 to $10,000",
     careType: "Memory care",
-    location: "Kirkwood, MO 63122",
+    diagnosis: "Yes",
+    location: "63122",
+    payment: "Private funds (savings, income, or a home sale)",
     contactConsent: true,
     shareConsent: true,
     utm_source: "google",
@@ -198,7 +216,9 @@ function buildRow_(d) {
     cell_(d.utm_term), // Q
     cell_(d.utm_content), // R
     cell_(d.gclid), // S
-    cell_(d.receivedAt || new Date().toISOString()) // T
+    cell_(d.receivedAt || new Date().toISOString()), // T
+    cell_(d.diagnosis), // U
+    cell_(d.payment) // V
   ];
 }
 
@@ -225,8 +245,10 @@ function leadLines_(d) {
     "Living situation: " + oneLine_(d.livingSituation),
     "Timeline: " + oneLine_(d.timeline),
     "Budget: " + oneLine_(d.budget),
+    "Plan to pay: " + (oneLine_(d.payment) || "(not provided)"),
     "Care type: " + oneLine_(d.careType),
-    "Location: " + oneLine_(d.location),
+    "Dementia/Alzheimer's diagnosis: " + (oneLine_(d.diagnosis) || "(not asked)"),
+    "ZIP code: " + oneLine_(d.location),
     "OK to share with communities: " + (d.shareConsent === true ? "Yes" : "No"),
     "UTM source: " + (oneLine_(d.utm_source) || "(none)"),
     "gclid: " + (oneLine_(d.gclid) || "(none)")
@@ -307,13 +329,22 @@ function rawJson_(d) {
   return s.length > 8000 ? s.slice(0, 8000) + "\n... (truncated)" : s;
 }
 
-/** One line: does this lead fit Kauhale (memory care, $7,500+/mo, St. Louis County)? */
+/**
+ * One line: does this lead fit Kauhale? YES needs memory care, $7,500+/mo, a St. Louis County
+ * ZIP, and nothing flagged. NO = a hard miss (a care type other than memory care or "Not sure
+ * yet", budget under $7,500, Medicaid). CHECK = couldn't tell (care type "Not sure yet", unsure
+ * budget, VA benefit / unsure payment, no or unsure diagnosis, ZIP not on the County list).
+ */
 function kauhaleFit_(d) {
   var misses = []; // definite no
   var checks = []; // can't tell, verify by phone
 
-  if (d.careType !== KAUHALE_CARE_TYPE) {
-    misses.push("care type is " + (oneLine_(d.careType) || "unknown") + ", not memory care");
+  var careType = oneLine_(d.careType);
+  var careUnsure = careType === CARE_TYPE_UNSURE;
+  if (careUnsure) {
+    checks.push("care type is " + CARE_TYPE_UNSURE + ", confirm memory care");
+  } else if (careType !== KAUHALE_CARE_TYPE) {
+    misses.push("care type is " + (careType || "unknown") + ", not memory care");
   }
 
   if (BUDGETS_7500_PLUS.indexOf(d.budget) === -1) {
@@ -324,12 +355,32 @@ function kauhaleFit_(d) {
     }
   }
 
+  var payment = oneLine_(d.payment);
+  if (PAYMENT_NO.indexOf(payment) !== -1) {
+    misses.push("payment is " + payment + ", not private pay");
+  } else if (payment && PAYMENT_OK.indexOf(payment) === -1) {
+    checks.push("payment is \"" + payment + "\", confirm how they will pay");
+  }
+
+  var diagnosis = oneLine_(d.diagnosis);
+  if (diagnosis && DIAGNOSIS_OK.indexOf(diagnosis) === -1) {
+    checks.push("diagnosis is \"" + diagnosis + "\", confirm dementia/Alzheimer's");
+  }
+
   if (!inStLouisCounty_(d.location)) {
-    checks.push("location \"" + (oneLine_(d.location) || "blank") + "\" not recognized as St. Louis County, verify");
+    var where = oneLine_(d.location);
+    checks.push(
+      /^\d{5}$/.test(where)
+        ? "ZIP " + where + " is not on the St. Louis County list, verify"
+        : "location \"" + (where || "blank") + "\" not recognized as St. Louis County, verify"
+    );
   }
 
   if (misses.length) return "KAUHALE FIT: NO - " + misses.concat(checks).join("; ");
-  if (checks.length) return "KAUHALE FIT: CHECK - memory care; " + checks.join("; ");
+  if (checks.length) {
+    // Only claim "memory care" when the visitor actually chose it.
+    return "KAUHALE FIT: CHECK - " + (careUnsure ? "" : "memory care; ") + checks.join("; ");
+  }
   return "KAUHALE FIT: YES - memory care, budget $7,500+, St. Louis County";
 }
 

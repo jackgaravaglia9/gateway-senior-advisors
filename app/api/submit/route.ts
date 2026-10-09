@@ -3,9 +3,12 @@ import { UTM_FIELDS, type UtmField } from "@/lib/utm";
 import {
   BUDGET_OPTIONS,
   CARE_TYPE_OPTIONS,
+  DIAGNOSIS_OPTIONS,
   LIVING_SITUATION_OPTIONS,
+  PAYMENT_OPTIONS,
   RELATIONSHIP_OPTIONS,
   TIMELINE_OPTIONS,
+  needsDiagnosis,
 } from "@/lib/intake-options";
 
 export const runtime = "nodejs";
@@ -18,7 +21,6 @@ const MAX_LENGTH = {
   fullName: 120,
   phone: 30,
   email: 254,
-  location: 200,
   age: 3,
   submittedAt: 40,
   utm: 200,
@@ -31,13 +33,17 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // stop waiting and report failure instead of leaving the visitor hanging.
 const WEBHOOK_TIMEOUT_MS = 8000;
 
+const ZIP_RE = /^\d{5}$/;
+
 interface CleanLead {
   relationship: string;
   age: string;
   careType: string;
+  diagnosis: string;
   location: string;
   livingSituation: string;
   budget: string;
+  payment: string;
   timeline: string;
   fullName: string;
   phone: string;
@@ -80,11 +86,22 @@ function cleanAndValidate(payload: RawPayload): { lead: CleanLead | null; errors
   const careType = pickOption(CARE_TYPE_OPTIONS, payload.careType);
   if (!careType) errors.push("careType is not an allowed value");
 
+  // Required only for the care types that ask it. For every other care type the answer is
+  // dropped to "" no matter what was sent.
+  let diagnosis = "";
+  if (needsDiagnosis(careType)) {
+    diagnosis = pickOption(DIAGNOSIS_OPTIONS, payload.diagnosis);
+    if (!diagnosis) errors.push("diagnosis is required for this care type");
+  }
+
   const livingSituation = pickOption(LIVING_SITUATION_OPTIONS, payload.livingSituation);
   if (!livingSituation) errors.push("livingSituation is not an allowed value");
 
   const budget = pickOption(BUDGET_OPTIONS, payload.budget);
   if (!budget) errors.push("budget is not an allowed value");
+
+  const payment = pickOption(PAYMENT_OPTIONS, payload.payment);
+  if (!payment) errors.push("payment is not an allowed value");
 
   const timeline = pickOption(TIMELINE_OPTIONS, payload.timeline);
   if (!timeline) errors.push("timeline is not an allowed value");
@@ -94,8 +111,9 @@ function cleanAndValidate(payload: RawPayload): { lead: CleanLead | null; errors
     errors.push("a valid age is required");
   }
 
-  const location = cleanText(payload.location).slice(0, MAX_LENGTH.location).trim();
-  if (!location) errors.push("location is required");
+  // "location" now holds a plain 5-digit ZIP code.
+  const location = cleanText(payload.location);
+  if (!ZIP_RE.test(location)) errors.push("location must be a 5-digit ZIP code");
 
   const fullName = cleanText(payload.fullName).slice(0, MAX_LENGTH.fullName).trim();
   if (!fullName) errors.push("fullName is required");
@@ -125,9 +143,11 @@ function cleanAndValidate(payload: RawPayload): { lead: CleanLead | null; errors
       relationship,
       age,
       careType,
+      diagnosis,
       location,
       livingSituation,
       budget,
+      payment,
       timeline,
       fullName,
       phone,
@@ -212,9 +232,11 @@ export async function POST(request: Request) {
     relationship: lead.relationship,
     age: lead.age,
     careType: lead.careType,
+    diagnosis: lead.diagnosis,
     location: lead.location,
     livingSituation: lead.livingSituation,
     budget: lead.budget,
+    payment: lead.payment,
     timeline: lead.timeline,
     fullName: lead.fullName,
     phone: lead.phone,
