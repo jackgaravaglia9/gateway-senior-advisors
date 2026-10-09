@@ -6,48 +6,17 @@ import { trackEvent, trackAdsConversion } from "@/lib/gtag";
 import { captureEvent } from "@/lib/posthog";
 import { emptyUtmValues, UTM_FIELDS, type UtmValues } from "@/lib/utm";
 import { emptyIntakeFormData, type IntakeFormData } from "@/lib/intake-form-types";
+import {
+  BUDGET_OPTIONS,
+  CARE_TYPE_OPTIONS,
+  LIVING_SITUATION_OPTIONS,
+  RELATIONSHIP_OPTIONS,
+  TIMELINE_OPTIONS,
+} from "@/lib/intake-options";
 
 const TOTAL_STEPS = 4;
 
 type Errors = Partial<Record<keyof IntakeFormData, string>>;
-
-const RELATIONSHIP_OPTIONS = [
-  "My parent",
-  "My spouse",
-  "Another relative",
-  "Myself",
-];
-
-const CARE_TYPE_OPTIONS = [
-  "Assisted living",
-  "Memory care",
-  "Independent living",
-  "Skilled nursing",
-  "Not sure yet",
-];
-
-const LIVING_SITUATION_OPTIONS = [
-  "Living at home alone",
-  "Living at home with family",
-  "Currently in a hospital or rehab facility",
-  "Already in a senior living community",
-  "Other",
-];
-
-const BUDGET_OPTIONS = [
-  "Under $3,000",
-  "$3,000-$4,500",
-  "$4,500-$6,000",
-  "$6,000+",
-  "Not sure yet",
-];
-
-const TIMELINE_OPTIONS = [
-  "Immediately (within 30 days)",
-  "1-3 months",
-  "3-6 months",
-  "Just researching for now",
-];
 
 function fieldClasses(hasError: boolean) {
   return `w-full border bg-white px-4 py-3.5 text-body placeholder:text-body-secondary/60 focus:outline-none focus:ring-2 focus:ring-gold/50 ${

@@ -1,65 +1,201 @@
 import { NextResponse } from "next/server";
-import { UTM_FIELDS } from "@/lib/utm";
+import { UTM_FIELDS, type UtmField } from "@/lib/utm";
+import {
+  BUDGET_OPTIONS,
+  CARE_TYPE_OPTIONS,
+  LIVING_SITUATION_OPTIONS,
+  RELATIONSHIP_OPTIONS,
+  TIMELINE_OPTIONS,
+} from "@/lib/intake-options";
 
 export const runtime = "nodejs";
 
-interface SubmitPayload {
-  relationship?: unknown;
-  age?: unknown;
-  careType?: unknown;
-  location?: unknown;
-  livingSituation?: unknown;
-  budget?: unknown;
-  timeline?: unknown;
-  fullName?: unknown;
-  phone?: unknown;
-  email?: unknown;
-  contactConsent?: unknown;
-  shareConsent?: unknown;
-  submittedAt?: unknown;
-  [key: string]: unknown;
-}
+type RawPayload = Record<string, unknown>;
+
+// Longest value accepted per text field. Required contact fields over the limit are rejected;
+// free text and tracking strings are trimmed so a weird URL can never cost us a real lead.
+const MAX_LENGTH = {
+  fullName: 120,
+  phone: 30,
+  email: 254,
+  location: 200,
+  age: 3,
+  submittedAt: 40,
+  utm: 200,
+  gclid: 300,
+} as const;
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-function isNonEmptyString(value: unknown): value is string {
-  return typeof value === "string" && value.trim().length > 0;
+// Apps Script usually answers in 1-3 seconds but can take longer on a cold start. Past this we
+// stop waiting and report failure instead of leaving the visitor hanging.
+const WEBHOOK_TIMEOUT_MS = 8000;
+
+interface CleanLead {
+  relationship: string;
+  age: string;
+  careType: string;
+  location: string;
+  livingSituation: string;
+  budget: string;
+  timeline: string;
+  fullName: string;
+  phone: string;
+  email: string;
+  contactConsent: boolean;
+  shareConsent: boolean;
+  submittedAt: string | null;
+  utm: Record<UtmField, string>;
 }
 
-function validate(payload: SubmitPayload): string[] {
+// Google Sheets runs a cell as a formula when it starts with = + - or @. Drop those (and any
+// leading whitespace) and swap control characters for spaces before a value goes near the Sheet.
+function cleanText(value: unknown): string {
+  if (typeof value !== "string") return "";
+  let spaced = "";
+  for (const ch of value) {
+    const code = ch.codePointAt(0) ?? 0;
+    spaced += code < 32 || code === 127 ? " " : ch;
+  }
+  return spaced.replace(/^[\s=+\-@]+/, "").trim();
+}
+
+function pickOption(options: string[], value: unknown): string {
+  return typeof value === "string" && options.includes(value) ? value : "";
+}
+
+function normalizeSubmittedAt(value: unknown): string | null {
+  if (typeof value !== "string" || value.length > MAX_LENGTH.submittedAt) return null;
+  const ms = Date.parse(value);
+  if (Number.isNaN(ms)) return null;
+  return cleanText(new Date(ms).toISOString());
+}
+
+function cleanAndValidate(payload: RawPayload): { lead: CleanLead | null; errors: string[] } {
   const errors: string[] = [];
 
-  if (!isNonEmptyString(payload.relationship)) errors.push("relationship is required");
-  if (!isNonEmptyString(payload.age) || Number.isNaN(Number(payload.age)))
+  const relationship = pickOption(RELATIONSHIP_OPTIONS, payload.relationship);
+  if (!relationship) errors.push("relationship is not an allowed value");
+
+  const careType = pickOption(CARE_TYPE_OPTIONS, payload.careType);
+  if (!careType) errors.push("careType is not an allowed value");
+
+  const livingSituation = pickOption(LIVING_SITUATION_OPTIONS, payload.livingSituation);
+  if (!livingSituation) errors.push("livingSituation is not an allowed value");
+
+  const budget = pickOption(BUDGET_OPTIONS, payload.budget);
+  if (!budget) errors.push("budget is not an allowed value");
+
+  const timeline = pickOption(TIMELINE_OPTIONS, payload.timeline);
+  if (!timeline) errors.push("timeline is not an allowed value");
+
+  const age = typeof payload.age === "string" ? payload.age.trim() : "";
+  if (!age || age.length > MAX_LENGTH.age || Number.isNaN(Number(age))) {
     errors.push("a valid age is required");
-  if (!isNonEmptyString(payload.careType)) errors.push("careType is required");
+  }
 
-  if (!isNonEmptyString(payload.location)) errors.push("location is required");
-  if (!isNonEmptyString(payload.livingSituation))
-    errors.push("livingSituation is required");
+  const location = cleanText(payload.location).slice(0, MAX_LENGTH.location).trim();
+  if (!location) errors.push("location is required");
 
-  if (!isNonEmptyString(payload.budget)) errors.push("budget is required");
-  if (!isNonEmptyString(payload.timeline)) errors.push("timeline is required");
+  const fullName = cleanText(payload.fullName).slice(0, MAX_LENGTH.fullName).trim();
+  if (!fullName) errors.push("fullName is required");
 
-  if (!isNonEmptyString(payload.fullName)) errors.push("fullName is required");
-  if (!isNonEmptyString(payload.phone)) errors.push("phone is required");
-  if (!isNonEmptyString(payload.email) || !EMAIL_RE.test(payload.email as string))
+  const phone = cleanText(payload.phone);
+  if (!phone || phone.length > MAX_LENGTH.phone) errors.push("a valid phone is required");
+
+  const email = cleanText(payload.email);
+  if (!email || email.length > MAX_LENGTH.email || !EMAIL_RE.test(email)) {
     errors.push("a valid email is required");
+  }
+
   if (payload.contactConsent !== true) errors.push("contactConsent must be accepted");
 
-  return errors;
+  if (errors.length > 0) return { lead: null, errors };
+
+  const utm = Object.fromEntries(
+    UTM_FIELDS.map((field) => [
+      field,
+      cleanText(payload[field]).slice(0, field === "gclid" ? MAX_LENGTH.gclid : MAX_LENGTH.utm),
+    ])
+  ) as Record<UtmField, string>;
+
+  return {
+    errors,
+    lead: {
+      relationship,
+      age,
+      careType,
+      location,
+      livingSituation,
+      budget,
+      timeline,
+      fullName,
+      phone,
+      email,
+      contactConsent: true,
+      shareConsent: payload.shareConsent === true,
+      submittedAt: normalizeSubmittedAt(payload.submittedAt),
+      utm,
+    },
+  };
+}
+
+type SheetResult =
+  | { ok: true; emailFailed: string | null }
+  | { ok: false; reason: string };
+
+// A lead counts as saved only when the Apps Script itself replies {"ok":true}. A 200 carrying
+// an HTML error page (how Apps Script reports a crash) or {"ok":false} is a failure.
+async function sendToSheet(url: string, body: unknown): Promise<SheetResult> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), WEBHOOK_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    if (!res.ok) return { ok: false, reason: `http_${res.status}` };
+
+    const text = await res.text();
+    let reply: { ok?: unknown; error?: unknown; emailSent?: unknown; emailError?: unknown } | null;
+    try {
+      reply = JSON.parse(text);
+    } catch {
+      return { ok: false, reason: "non_json_response" };
+    }
+    if (!reply || reply.ok !== true) {
+      const detail = typeof reply?.error === "string" ? reply.error.slice(0, 40) : "unknown";
+      return { ok: false, reason: `script_reported_failure_${detail}` };
+    }
+    const emailFailed =
+      reply.emailSent === false ? String(reply.emailError ?? "unknown").slice(0, 120) : null;
+    return { ok: true, emailFailed };
+  } catch (err) {
+    const aborted = (err as { name?: string } | null)?.name === "AbortError";
+    return { ok: false, reason: aborted ? "timeout" : "network_error" };
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export async function POST(request: Request) {
-  let payload: SubmitPayload;
+  const receivedAt = new Date().toISOString();
+
+  let payload: unknown;
   try {
     payload = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const errors = validate(payload);
-  if (errors.length > 0) {
+  if (typeof payload !== "object" || payload === null || Array.isArray(payload)) {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  const { lead, errors } = cleanAndValidate(payload as RawPayload);
+  if (!lead) {
     return NextResponse.json({ error: "Validation failed", details: errors }, { status: 400 });
   }
 
@@ -73,44 +209,31 @@ export async function POST(request: Request) {
   }
 
   const forwardPayload = {
-    relationship: payload.relationship,
-    age: payload.age,
-    careType: payload.careType,
-    location: payload.location,
-    livingSituation: payload.livingSituation,
-    budget: payload.budget,
-    timeline: payload.timeline,
-    fullName: payload.fullName,
-    phone: payload.phone,
-    email: payload.email,
-    contactConsent: payload.contactConsent === true,
-    shareConsent: payload.shareConsent === true,
-    submittedAt: isNonEmptyString(payload.submittedAt)
-      ? payload.submittedAt
-      : new Date().toISOString(),
-    ...Object.fromEntries(UTM_FIELDS.map((field) => [field, payload[field] ?? ""])),
+    relationship: lead.relationship,
+    age: lead.age,
+    careType: lead.careType,
+    location: lead.location,
+    livingSituation: lead.livingSituation,
+    budget: lead.budget,
+    timeline: lead.timeline,
+    fullName: lead.fullName,
+    phone: lead.phone,
+    email: lead.email,
+    contactConsent: lead.contactConsent,
+    shareConsent: lead.shareConsent,
+    submittedAt: lead.submittedAt ?? receivedAt,
+    receivedAt,
+    ...lead.utm,
   };
 
-  try {
-    const webhookRes = await fetch(webhookUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(forwardPayload),
-    });
-
-    if (!webhookRes.ok) {
-      console.error("Sheet webhook returned an error status", webhookRes.status);
-      return NextResponse.json(
-        { error: "Failed to record submission" },
-        { status: 502 }
-      );
-    }
-  } catch (err) {
-    console.error("Failed to reach sheet webhook", err);
-    return NextResponse.json(
-      { error: "Failed to record submission" },
-      { status: 502 }
-    );
+  const result = await sendToSheet(webhookUrl, forwardPayload);
+  if (!result.ok) {
+    // No lead data in this log line, only why it failed.
+    console.error("Lead was NOT recorded in the Sheet", { reason: result.reason });
+    return NextResponse.json({ error: "Failed to record submission" }, { status: 502 });
+  }
+  if (result.emailFailed) {
+    console.warn("Lead saved, but the alert email failed", { detail: result.emailFailed });
   }
 
   return NextResponse.json({ ok: true });

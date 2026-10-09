@@ -45,7 +45,7 @@ error path).
   "careType": "Assisted living",
   "location": "Kirkwood, MO",
   "livingSituation": "Living at home alone",
-  "budget": "$3,000-$4,500",
+  "budget": "$7,500 to $10,000",
   "timeline": "1-3 months",
   "fullName": "Jane Doe",
   "phone": "314-555-0100",
@@ -53,6 +53,7 @@ error path).
   "contactConsent": true,
   "shareConsent": false,
   "submittedAt": "2026-09-10T18:00:00.000Z",
+  "receivedAt": "2026-09-10T18:00:01.000Z",
   "utm_source": "google",
   "utm_medium": "cpc",
   "utm_campaign": "stl-assisted-living",
@@ -62,8 +63,14 @@ error path).
 }
 ```
 
-Your Apps Script `doPost(e)` should `JSON.parse(e.postData.contents)` and append a
-row with these fields.
+`submittedAt` is the visitor's browser clock; `receivedAt` is stamped by the server and is
+the one to trust. The route only treats a lead as saved when the script replies
+`{"ok":true}`, and gives up after 8 seconds.
+
+The current script (appends the row, then emails an alert with a Kauhale-fit line) is
+saved in [`docs/apps-script.gs`](docs/apps-script.gs). Paste it into the Sheet's Apps
+Script editor and deploy a new version of the existing Web app. It expects a `receivedAt`
+header in cell T1.
 
 ## Running locally
 
